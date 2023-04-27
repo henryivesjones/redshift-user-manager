@@ -154,6 +154,7 @@ class RedshiftUserManager:
     A class for orchestrating user creation/deletion and role granting/revoking.
     """
 
+    concurrency: int
     username: str
     password: str
     config: RedshiftUserManagerConfig
@@ -168,7 +169,9 @@ class RedshiftUserManager:
         username: str,
         password: str,
         state_yaml_file: str,
+        concurrency: int = 1
     ):
+        self.concurrency = concurrency
         self.config = RedshiftUserManager.parse_config_yaml(config_yaml_file)
         self.state_yaml_file = state_yaml_file
         self.state = RedshiftUserManager.parse_state_yaml(state_yaml_file)
@@ -182,7 +185,8 @@ class RedshiftUserManager:
             user=self.username,
             password=self.password,
             database=self.config.database,
-            max_size=20,
+            max_size=self.concurrency,
+            min_size=1,
         )
         return self
 
@@ -231,12 +235,7 @@ class RedshiftUserManager:
         if self.state.get_user(user_name) is not None:
             raise UserAlreadyExists(user_name)
         if password is None:
-            password = "".join(
-                [
-                    char if index % random.randint(2, 4) != 0 else char.upper()
-                    for index, char in enumerate(uuid4().hex)
-                ]
-            )
+            password = RedshiftUserManager.generate_password()
         permissions = self._get_permissions(roles)
         try:
             await self._db_create_user(user_name, password)
@@ -245,6 +244,32 @@ class RedshiftUserManager:
         await self._grant_permissions(user_name, permissions)
 
         self.state.create_user(user_name, roles)
+
+        return password
+
+    async def update_user_password(
+        self, user_name: str, password: Optional[str]
+    ) -> str:
+        """
+        Update the password for a given user.
+
+        Args:
+            user_name (str): The user to update the password for.
+            password (Optional[str]): The password to set for the user. If none is provided then a random one will be generated.
+
+        Raises:
+            UserDoesntExist: Raised when the given user does not exist.
+
+        Returns:
+            str: The password that was set for the user.
+        """
+        user = self.state.get_user(user_name)
+        if user is None:
+            raise UserDoesntExist(user_name)
+        if password is None:
+            password = RedshiftUserManager.generate_password()
+
+        await self._db_update_user_password(user_name, password)
 
         return password
 
@@ -417,6 +442,13 @@ class RedshiftUserManager:
             tasks.append(self._db_revoke_all_schema(schema, user_name))
         return tasks
 
+    async def _db_update_user_password(self, user_name: str, password: str):
+        query = f"""
+ALTER USER "{user_name}" WITH PASSWORD '{password}';;
+        """.strip()
+        async with self.pool.acquire() as conn:
+            await conn.execute(query)
+
     async def _db_grant_schema(
         self, schema: str, user_name: str, level: PermissionLevel
     ) -> None:
@@ -567,3 +599,18 @@ where nspname = 'public' or nspowner > 1;
             return RedshiftUserManagerConfig(**config)
         except ValidationError as e:
             raise InvalidConfig(e)
+
+    @staticmethod
+    def generate_password() -> str:
+        """
+        Generate a random password
+
+        Returns:
+            str: The generated password
+        """
+        return "".join(
+            [
+                char if index % random.randint(2, 4) != 0 else char.upper()
+                for index, char in enumerate(uuid4().hex)
+            ]
+        )

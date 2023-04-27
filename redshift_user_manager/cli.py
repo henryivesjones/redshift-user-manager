@@ -102,6 +102,7 @@ async def create_user(
             state_yaml_file=state_file,
             username=sys_username,
             password=sys_password,
+            concurrency=1,
         ) as rum:
             try:
                 password = await rum.create_user(
@@ -136,9 +137,45 @@ async def delete_user(
             state_yaml_file=state_file,
             username=sys_username,
             password=sys_password,
+            concurrency=20,
         ) as rum:
             try:
                 await rum.delete_user(user_name=user_name)
+            except exceptions.UserDoesntExist:
+                raise click.ClickException(
+                    f"No user with the username: '{user_name}' exists."
+                )
+    except exceptions.RedshiftUserManagerException as e:
+        raise click.ClickException(f"{type(e).__name__} {e}")
+
+
+@cli.command("update-password")
+@coro
+@click.argument("user_name")
+@click.option("-p", "--password", default=None)
+@common_params
+async def update_password(
+    user_name: str,
+    password: Optional[str],
+    config_file: str,
+    state_file: str,
+    sys_username: str,
+    sys_password: str,
+):
+    """
+    Update the password of a user.
+    """
+    try:
+        async with RedshiftUserManager(
+            config_yaml_file=config_file,
+            state_yaml_file=state_file,
+            username=sys_username,
+            password=sys_password,
+            concurrency=1,
+        ) as rum:
+            try:
+                p = await rum.update_user_password(user_name, password)
+                click.echo(p)
             except exceptions.UserDoesntExist:
                 raise click.ClickException(
                     f"No user with the username: '{user_name}' exists."
@@ -169,6 +206,7 @@ async def grant_user(
             state_yaml_file=state_file,
             username=sys_username,
             password=sys_password,
+            concurrency=1,
         ) as rum:
             if len(role) == 0:
                 return
@@ -208,6 +246,7 @@ async def revoke_user(
             state_yaml_file=state_file,
             username=sys_username,
             password=sys_password,
+            concurrency=1,
         ) as rum:
             if len(role) == 0:
                 return
@@ -249,6 +288,7 @@ async def refresh_user(
             state_yaml_file=state_file,
             username=sys_username,
             password=sys_password,
+            concurrency=1,
         ) as rum:
             try:
                 await rum.refresh_user_roles(user_name, only_grant=only_grant)
@@ -278,6 +318,7 @@ async def get_users(
             state_yaml_file=state_file,
             username=sys_username,
             password=sys_password,
+            concurrency=1,
         ) as rum:
             for user in rum.state.users:
                 click.echo(f"{user.user_name} - ({', '.join(user.roles)})")
@@ -305,6 +346,7 @@ async def refresh_all(
             state_yaml_file=state_file,
             username=sys_username,
             password=sys_password,
+            concurrency=1,
         ) as rum:
             for user in rum.state.users:
                 click.echo(f"Refreshing {user.user_name}.")
@@ -333,6 +375,7 @@ async def user_permissions(
             state_yaml_file=state_file,
             username=sys_username,
             password=sys_password,
+            concurrency=1,
         ) as rum:
             user = rum.state.get_user(user_name)
             if user is None:
