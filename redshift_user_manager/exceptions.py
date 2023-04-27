@@ -3,9 +3,6 @@ class RedshiftUserManagerException(Exception):
     All RUM exceptions inherit from this exception.
     """
 
-    # def __str__(self):
-    #     return f"{type(self)}: {self}"
-
 
 class InvalidConfig(RedshiftUserManagerException):
     """
