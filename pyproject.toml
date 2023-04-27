@@ -1,0 +1,43 @@
+[project]
+name = "redshift-user-manager"
+dynamic = ["version"]
+authors = [
+  { name="Henry Jones", email="henryivesjones@gmail.com" },
+]
+description = "A user management CLI tool for AWS Redshift."
+readme = "README.md"
+requires-python = ">=3.6"
+license = {text="GPL-3.0-or-later"}
+classifiers = [
+  "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.7",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+]
+
+dependencies = [
+    "pydantic",
+    "pyyaml",
+    "asyncpg==0.27.0",
+    "click>=8.0.0"
+]
+
+keywords = [
+  "sql",
+  "redshift",
+  "user",
+  "managment"
+]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project.scripts]
+rum = "redshift_user_manager.cli:entrypoint"
+
+[tool.setuptools.dynamic]
+version = {attr = "redshift_user_manager.__version__"}
